@@ -6,6 +6,8 @@ metadata:
   name: idp-lab-repos
   description: The 5 repos of the IDP lab.
 spec:
+  # Targets are GitHub URLs; without this the type is inherited from the parent (file).
+  type: url
   targets:
     - https://github.com/bhumi46/platform-infra/blob/main/catalog-info.yaml
     - https://github.com/bhumi46/gitops/blob/main/catalog-info.yaml
