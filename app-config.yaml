@@ -147,12 +147,18 @@ integrations:
     #   token: ${GHE_TOKEN}
 
 proxy:
-  ### Example for how to add a proxy endpoint for the frontend.
-  ### A typical reason to do this is to handle HTTPS and CORS for internal services.
-  # endpoints:
-  #   '/test':
-  #     target: 'https://example.com'
-  #     changeOrigin: true
+  endpoints:
+    # Argo CD API for the Roadie Argo CD plugin. Token: read-only Argo CD account "backstage"
+    # (platform-infra), written to .env by scripts/cluster-tokens.sh.
+    '/argocd/api':
+      target: http://localhost:8080/api/v1/
+      changeOrigin: true
+      headers:
+        Authorization: Bearer ${ARGOCD_AUTH_TOKEN}
+
+# Links from the Argo CD card to the Argo CD UI.
+argocd:
+  baseUrl: http://localhost:8080
 
 # Reference documentation http://backstage.io/docs/features/techdocs/configuration
 # Note: After experimenting with basic setup, use CI/CD to generate docs
@@ -218,6 +224,20 @@ catalog:
 
 kubernetes:
   # see https://backstage.io/docs/features/kubernetes/configuration for kubernetes configuration options
+  # Objects are matched by the label backstage.io/kubernetes-id=<component> in every namespace.
+  serviceLocatorMethod:
+    type: multiTenant
+  clusterLocatorMethods:
+    - type: config
+      clusters:
+        - name: idp-lab
+          url: ${K8S_CLUSTER_URL}
+          authProvider: serviceAccount
+          # Read-only ServiceAccount from platform-infra (modules/backstage-access).
+          serviceAccountToken: ${K8S_SA_TOKEN}
+          skipTLSVerify: true # local kind cluster only
+          # kind has no metrics-server; don't query metrics.k8s.io (would show 403/404 errors).
+          skipMetricsLookup: true
 
 # see https://backstage.io/docs/permissions/getting-started for more on the permission framework
 permission:
