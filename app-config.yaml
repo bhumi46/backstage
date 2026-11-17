@@ -220,7 +220,11 @@ catalog:
     - type: file
       target: ../../catalog/locations.yaml
 
-    # Software templates are added here in steps 4c/4d, with rules: [{allow: [Template]}].
+    # Software templates (step 4c/4d).
+    - type: file
+      target: ../../templates/new-go-service/template.yaml
+      rules:
+        - allow: [Template]
 
 kubernetes:
   # see https://backstage.io/docs/features/kubernetes/configuration for kubernetes configuration options

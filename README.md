@@ -43,6 +43,20 @@ The kind cluster has no metrics-server, so `skipMetricsLookup: true` is set for 
 - `catalog/org.yaml`: Group `platform-team`, User `bhumi46`, System `idp-lab`.
 - `catalog/locations.yaml`: the `catalog-info.yaml` of `platform-infra`, `gitops`, `users-svc`, `orders-svc` and this repo, read from GitHub `main`.
 
+## Software templates
+
+### New Go service (`templates/new-go-service`)
+
+Create → **New Go service**. Parameters: name, description, owner, environments (`dev`/`staging`), and a GitOps token (Secret field).
+
+1. `fetch:template` renders `skeleton/` (same layout, CI and chart as `orders-svc`/`users-svc`; neutral `/api/items`). Workflow files and Helm templates are copied without templating.
+2. `publish:github` creates public `bhumi46/<name>` and stores the token as its `GITOPS_TOKEN` Actions secret.
+3. `fetch:template` (once per env) renders `gitops-skeleton/` → `apps/<name>-<env>.yaml` and `envs/<env>/<name>/values.yaml` with `image.tag` = the repo's first commit.
+4. `publish:github:pull-request` opens that PR in `bhumi46/gitops`.
+5. `catalog:register` adds the new component.
+
+Merge the gitops PR once the new repo's first CI run is green (image + chart published). Until then CI's dev bump is skipped on purpose, so it can't conflict with the PR.
+
 ## Checks
 
 ```sh

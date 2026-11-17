@@ -1,0 +1,135 @@
+apiVersion: scaffolder.backstage.io/v1beta3
+kind: Template
+metadata:
+  name: new-go-service
+  title: New Go service
+  description: >-
+    Creates a Go HTTP service repo (code, Dockerfile, Helm chart, CI, catalog entry, docs) and opens a
+    PR in gitops that deploys it with Argo CD. Backstage only creates the repo and the PR; Argo CD
+    applies the change after the PR is merged.
+  tags: [go, service, recommended]
+spec:
+  owner: group:platform-team
+  type: service
+
+  parameters:
+    - title: Service
+      required: [name, description, owner]
+      properties:
+        name:
+          title: Name
+          type: string
+          description: Repo, image, chart and Kubernetes name, e.g. payments-svc.
+          pattern: '^[a-z][a-z0-9-]{1,38}[a-z0-9]$'
+          ui:field: EntityNamePicker
+          ui:autofocus: true
+        description:
+          title: Description
+          type: string
+          maxLength: 200
+        owner:
+          title: Owner
+          type: string
+          ui:field: OwnerPicker
+          ui:options:
+            catalogFilter:
+              kind: Group
+          default: group:platform-team
+
+    - title: Deployment
+      # gitopsToken is a Secret field: its value is sent as a task secret, not a parameter, so it can't
+      # be listed in "required" (server-side validation only sees parameters).
+      required: [environments]
+      properties:
+        environments:
+          title: Environments
+          description: Namespaces created by platform-infra. Dev is updated by CI; others are promoted by PR.
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items:
+            type: string
+            enum: [dev, staging]
+          default: [dev]
+          ui:widget: checkboxes
+        gitopsToken:
+          title: GitOps token
+          type: string
+          description: >-
+            PAT with write access to bhumi46/gitops. Stored only as the new repo's GITOPS_TOKEN Actions
+            secret so its CI can bump the dev image tag.
+          ui:field: Secret
+
+  steps:
+    - id: fetch-service
+      name: Generate service
+      action: fetch:template
+      input:
+        url: ./skeleton
+        targetPath: ./service
+        # GitHub Actions ${{ }} and Helm {{ }} syntax must not go through the template engine.
+        copyWithoutTemplating:
+          - .github/workflows/*
+          - charts/*/templates/*
+        values:
+          name: ${{ parameters.name }}
+          description: ${{ parameters.description }}
+          owner: ${{ parameters.owner }}
+
+    - id: publish
+      name: Create repository
+      action: publish:github
+      input:
+        sourcePath: ./service
+        repoUrl: github.com?owner=bhumi46&repo=${{ parameters.name }}
+        description: ${{ parameters.description }}
+        repoVisibility: public
+        defaultBranch: main
+        gitCommitMessage: 'initial commit from the New Go service template'
+        secrets:
+          GITOPS_TOKEN: ${{ secrets.gitopsToken }}
+
+    - id: fetch-gitops
+      name: Generate gitops files
+      each: ${{ parameters.environments }}
+      action: fetch:template
+      input:
+        url: ./gitops-skeleton
+        targetPath: ./gitops
+        values:
+          name: ${{ parameters.name }}
+          env: ${{ each.value }}
+          imageTag: ${{ steps['publish'].output.commitHash }}
+
+    - id: gitops-pr
+      name: Open gitops PR
+      action: publish:github:pull-request
+      input:
+        repoUrl: github.com?owner=bhumi46&repo=gitops
+        sourcePath: ./gitops
+        branchName: add-${{ parameters.name }}
+        title: Deploy ${{ parameters.name }} to ${{ parameters.environments | join(', ') }}
+        description: |
+          Adds Argo CD Application(s) and values for **${{ parameters.name }}** (created by the Backstage template *New Go service*).
+
+          - `apps/${{ parameters.name }}-<env>.yaml`
+          - `envs/<env>/${{ parameters.name }}/values.yaml` with `image.tag` = the repo's first commit
+
+          Merge after the new repo's CI has published the image and chart. Argo CD then deploys it.
+
+    - id: register
+      name: Register in catalog
+      action: catalog:register
+      input:
+        repoContentsUrl: ${{ steps['publish'].output.repoContentsUrl }}
+        catalogInfoPath: /catalog-info.yaml
+
+  output:
+    links:
+      - title: Repository
+        url: ${{ steps['publish'].output.remoteUrl }}
+      - title: GitOps pull request
+        url: ${{ steps['gitops-pr'].output.remoteUrl }}
+      - title: Open in catalog
+        icon: catalog
+        entityRef: ${{ steps['register'].output.entityRef }}
