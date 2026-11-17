@@ -1,0 +1,29 @@
+# Org data for the IDP lab. The User name must equal the GitHub login, because sign-in uses
+# the usernameMatchingUserEntityName resolver.
+apiVersion: backstage.io/v1alpha1
+kind: Group
+metadata:
+  name: platform-team
+  description: Owns the IDP lab platform and services.
+spec:
+  type: team
+  children: []
+---
+apiVersion: backstage.io/v1alpha1
+kind: User
+metadata:
+  name: bhumi46
+  annotations:
+    github.com/user-login: bhumi46
+spec:
+  profile:
+    displayName: bhumi46
+  memberOf: [platform-team]
+---
+apiVersion: backstage.io/v1alpha1
+kind: System
+metadata:
+  name: idp-lab
+  description: Backstage IDP lab on a local kind cluster (Terraform, GitHub Actions, Helm, Argo CD).
+spec:
+  owner: group:platform-team

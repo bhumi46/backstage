@@ -1,0 +1,12 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: backstage
+  description: The IDP lab developer portal (catalog, software templates, plugins).
+  annotations:
+    github.com/project-slug: bhumi46/backstage
+spec:
+  type: website
+  lifecycle: experimental
+  owner: group:platform-team
+  system: idp-lab

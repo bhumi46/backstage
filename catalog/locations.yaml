@@ -1,0 +1,14 @@
+# catalog-info.yaml of every repo in the lab. New services created by the
+# "New Go service" template register themselves with catalog:register instead.
+apiVersion: backstage.io/v1alpha1
+kind: Location
+metadata:
+  name: idp-lab-repos
+  description: The 5 repos of the IDP lab.
+spec:
+  targets:
+    - https://github.com/bhumi46/platform-infra/blob/main/catalog-info.yaml
+    - https://github.com/bhumi46/gitops/blob/main/catalog-info.yaml
+    - https://github.com/bhumi46/users-svc/blob/main/catalog-info.yaml
+    - https://github.com/bhumi46/orders-svc/blob/main/catalog-info.yaml
+    - https://github.com/bhumi46/backstage/blob/main/catalog-info.yaml

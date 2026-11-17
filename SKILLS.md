@@ -24,7 +24,7 @@ Repeatable playbooks for agents working in this repo. Each one says when to use 
 
 1. Install pinned frontend + backend packages with `yarn --cwd packages/app add` / `yarn --cwd packages/backend add`.
 2. Register the backend module in `packages/backend/src/index.ts`.
-3. Add the entity card/tab in `packages/app/src/components/catalog/EntityPage.tsx`.
+3. Wire the frontend (this app uses the **new frontend system**): import the plugin's `/alpha` export and add it to `features` in `packages/app/src/App.tsx` (or rely on `app.packages: all` discovery). Enable/position its entity cards and tabs under `app.extensions` in `app-config.yaml`. There is no `EntityPage.tsx`.
 4. Add config to `app-config.yaml` using env vars for tokens:
    - Kubernetes: kind cluster URL + ServiceAccount token (`K8S_SA_TOKEN`), `skipTLSVerify: true` for local only.
    - Argo CD: `http://localhost:8080` + `ARGOCD_AUTH_TOKEN`.

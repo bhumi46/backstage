@@ -27,14 +27,17 @@ Sibling repos (separate GitHub repos, all under `<owner>`):
 ## Expected layout
 
 ```
-packages/app/                 frontend (plugins: GitHub Actions, Kubernetes, Argo CD, TechDocs)
+packages/app/                 frontend, new frontend system (plugins: GitHub Actions, Kubernetes, Argo CD, TechDocs)
 packages/backend/             backend (catalog, scaffolder, auth, kubernetes, techdocs)
 templates/
   new-go-service/template.yaml + skeleton/   (copied from orders-svc, ${{ values.name }} placeholders)
   new-environment/template.yaml + skeleton/  (env YAML for platform-infra, values for gitops)
 catalog/                      org.yaml (Group platform-team, Users), locations
 app-config.yaml               base config; secrets via env vars only
+catalog/locations.yaml        Location listing the 5 repos' catalog-info.yaml
 app-config.local.yaml         local overrides (gitignored)
+.env / .env.example           secrets for local runs (.env is gitignored)
+scripts/start.sh              load .env, start PostgreSQL, yarn start
 docker-compose.yaml           local PostgreSQL
 ```
 
