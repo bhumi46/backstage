@@ -225,6 +225,10 @@ catalog:
       target: ../../templates/new-go-service/template.yaml
       rules:
         - allow: [Template]
+    - type: file
+      target: ../../templates/new-environment/template.yaml
+      rules:
+        - allow: [Template]
 
 kubernetes:
   # see https://backstage.io/docs/features/kubernetes/configuration for kubernetes configuration options

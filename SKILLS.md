@@ -39,7 +39,7 @@ Repeatable playbooks for agents working in this repo. Each one says when to use 
 **Use when:** editing `templates/new-go-service` or `templates/new-environment`.
 
 1. Skeleton files use `${{ values.<param> }}`; keep paths identical to the target repos (see AGENTS.md).
-2. Only use `fetch:template`, `publish:github`, `publish:github:pull-request`, `catalog:register`. No cluster/infra mutation.
+2. Only use `fetch:template`, `publish:github`, `publish:github:pull-request`, `catalog:register`, plus the in-repo **read-only** `gitops:read-image-tags` (`packages/backend/src/modules/gitopsActions`). No cluster/infra mutation.
 3. Always add `output.links` for the repo, PR(s) and catalog entity.
 4. Register the template in `app-config.yaml` under `catalog.locations` with `rules: [{allow: [Template]}]`.
 

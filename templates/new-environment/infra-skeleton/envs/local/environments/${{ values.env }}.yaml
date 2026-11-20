@@ -1,0 +1,4 @@
+owner: ${{ values.owner }}
+cpu: "${{ values.cpu }}"
+memory: ${{ values.memory }}
+max_pods: ${{ values.maxPods }}

@@ -1,0 +1,142 @@
+apiVersion: scaffolder.backstage.io/v1beta3
+kind: Template
+metadata:
+  name: new-environment
+  title: New environment
+  description: >-
+    Creates an environment (a namespace with a quota in the idp-lab cluster) and deploys the chosen
+    services into it. Opens one PR in platform-infra (Terraform creates the namespace after merge +
+    terraform apply) and one in gitops (Argo CD deploys the services after merge).
+  tags: [environment, terraform, argocd]
+spec:
+  owner: group:platform-team
+  type: environment
+
+  parameters:
+    - title: Environment
+      required: [name, owner, cpu, memory, maxPods]
+      properties:
+        name:
+          title: Name
+          type: string
+          description: Namespace name, e.g. qa.
+          pattern: '^[a-z][a-z0-9-]{0,18}[a-z0-9]$'
+          not:
+            enum: [dev, staging, argocd, backstage, default, kube-system, kube-public, kube-node-lease, local-path-storage]
+          ui:autofocus: true
+        owner:
+          title: Owner
+          type: string
+          ui:field: OwnerPicker
+          ui:options:
+            catalogFilter:
+              kind: Group
+          default: group:platform-team
+        cpu:
+          title: CPU quota
+          type: string
+          description: Total CPU requests/limits for the namespace, e.g. "2" or "1500m".
+          pattern: '^[0-9]+(m)?$'
+          default: '2'
+        memory:
+          title: Memory quota
+          type: string
+          pattern: '^[0-9]+(Mi|Gi)$'
+          default: 4Gi
+        maxPods:
+          title: Max pods
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 20
+
+    - title: Services
+      required: [services]
+      properties:
+        services:
+          title: Services to deploy
+          description: Each starts at the image tag currently running in dev.
+          type: array
+          minItems: 1
+          items:
+            type: string
+          ui:field: MultiEntityPicker
+          ui:options:
+            catalogFilter:
+              kind: Component
+              spec.type: service
+
+  steps:
+    - id: read-tags
+      name: Read dev image tags
+      action: gitops:read-image-tags
+      input:
+        repoUrl: https://github.com/bhumi46/gitops/blob/main
+        services: ${{ parameters.services }}
+        fromEnv: dev
+
+    - id: fetch-infra
+      name: Generate environment file
+      action: fetch:template
+      input:
+        url: ./infra-skeleton
+        targetPath: ./infra
+        values:
+          env: ${{ parameters.name }}
+          owner: ${{ parameters.owner | parseEntityRef | pick('name') }}
+          cpu: ${{ parameters.cpu }}
+          memory: ${{ parameters.memory }}
+          maxPods: ${{ parameters.maxPods }}
+
+    - id: infra-pr
+      name: Open platform-infra PR
+      action: publish:github:pull-request
+      input:
+        repoUrl: github.com?owner=bhumi46&repo=platform-infra
+        sourcePath: ./infra
+        branchName: env-${{ parameters.name }}
+        title: Add environment ${{ parameters.name }}
+        description: |
+          Adds `envs/local/environments/${{ parameters.name }}.yaml` (created by the Backstage template *New environment*).
+
+          After merging, run `terraform apply` in `envs/local`: it creates the `${{ parameters.name }}` namespace with its ResourceQuota and LimitRange. Backstage never runs Terraform.
+
+    - id: fetch-gitops
+      name: Generate gitops files
+      each: ${{ steps['read-tags'].output.services }}
+      action: fetch:template
+      input:
+        url: ./gitops-skeleton
+        targetPath: ./gitops
+        values:
+          name: ${{ each.value }}
+          env: ${{ parameters.name }}
+          imageTag: ${{ steps['read-tags'].output.tags[each.value] }}
+
+    - id: gitops-pr
+      name: Open gitops PR
+      action: publish:github:pull-request
+      input:
+        repoUrl: github.com?owner=bhumi46&repo=gitops
+        sourcePath: ./gitops
+        branchName: env-${{ parameters.name }}
+        title: Deploy ${{ steps['read-tags'].output.services | join(', ') }} to ${{ parameters.name }}
+        description: |
+          Adds Argo CD Applications and values for the **${{ parameters.name }}** environment (created by the Backstage template *New environment*).
+
+          - `apps/<svc>-${{ parameters.name }}.yaml`
+          - `envs/${{ parameters.name }}/<svc>/values.yaml` with `image.tag` copied from `envs/dev`
+
+          Merge **after** the platform-infra PR is merged and applied, so the namespace exists.
+
+  output:
+    links:
+      - title: platform-infra pull request
+        url: ${{ steps['infra-pr'].output.remoteUrl }}
+      - title: gitops pull request
+        url: ${{ steps['gitops-pr'].output.remoteUrl }}
+    text:
+      - title: Next steps
+        content: |
+          1. Merge the **platform-infra** PR, then run `terraform apply` in `platform-infra/envs/local`.
+          2. Merge the **gitops** PR. Argo CD deploys the services into `${{ parameters.name }}`.

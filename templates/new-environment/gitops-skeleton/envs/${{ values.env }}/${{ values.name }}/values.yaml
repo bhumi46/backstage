@@ -1,0 +1,9 @@
+image:
+  # Copied from envs/dev when the environment was created; promote later with scripts/promote.sh.
+  tag: ${{ values.imageTag }}
+replicaCount: 1
+env:
+  LOG_LEVEL: info
+{%- if values.name == 'orders-svc' %}
+  USERS_SVC_URL: http://users-svc.${{ values.env }}.svc.cluster.local
+{%- endif %}

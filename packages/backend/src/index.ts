@@ -19,6 +19,8 @@ backend.add(import('@backstage/plugin-scaffolder-backend-module-github'));
 backend.add(
   import('@backstage/plugin-scaffolder-backend-module-notifications'),
 );
+// read-only gitops:read-image-tags action (New environment template)
+backend.add(import('./modules/gitopsActions'));
 
 // techdocs plugin
 backend.add(import('@backstage/plugin-techdocs-backend'));

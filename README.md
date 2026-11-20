@@ -57,6 +57,22 @@ Create → **New Go service**. Parameters: name, description, owner, environment
 
 Merge the gitops PR once the new repo's first CI run is green (image + chart published). Until then CI's dev bump is skipped on purpose, so it can't conflict with the PR.
 
+New repos get branch protection that requires a PR but no approving review, so a solo owner can merge.
+
+### New environment (`templates/new-environment`)
+
+Create → **New environment**. Parameters: name (e.g. `qa`), owner, CPU/memory/max-pods quota, and the services to deploy (any catalog Component of type `service`).
+
+1. `gitops:read-image-tags` reads each service's `image.tag` from `gitops` `envs/dev/<svc>/values.yaml`. This is a small **read-only** action in this repo (`packages/backend/src/modules/gitopsActions`), because no built-in action can read a file's contents.
+2. `fetch:template` + `publish:github:pull-request` open a PR in `bhumi46/platform-infra` adding `envs/local/environments/<env>.yaml` (`owner`, `cpu`, `memory`, `max_pods`).
+3. `fetch:template` (once per service) + `publish:github:pull-request` open a PR in `bhumi46/gitops` adding `apps/<svc>-<env>.yaml` and `envs/<env>/<svc>/values.yaml` (dev tag, 1 replica; `orders-svc` gets `USERS_SVC_URL` for the same namespace).
+
+Then, in this order:
+1. Merge the platform-infra PR and run `terraform apply` in `platform-infra/envs/local` (you run it; Backstage never runs Terraform). This creates the namespace, ResourceQuota and LimitRange.
+2. Merge the gitops PR. Argo CD deploys the services into the new namespace.
+
+Each environment is a namespace in the same kind cluster, managed by the same Argo CD.
+
 ## Checks
 
 ```sh
@@ -80,4 +96,7 @@ Backstage packages use the ranges written by create-app; `yarn.lock` pins the ex
 | `@roadiehq/backstage-plugin-argo-cd` | 2.13.1 |
 | `@backstage/plugin-kubernetes` / `-backend` | 0.12.24 / 0.21.12 (from create-app) |
 | `@backstage/plugin-techdocs` / `-backend` | 1.19.0 / 2.4.0 (from create-app) |
+| `@backstage/plugin-scaffolder-node` (custom action) | 0.13.8 |
+| `@backstage/backend-plugin-api` (custom action) | 1.11.0 |
+| `yaml` (custom action) | 2.9.1 |
 | PostgreSQL image | `postgres:17.7-alpine@sha256:bb377b7239d2774ac8cc76f481596ce96c5a6b5e9d141f6d0a0ee371a6e7c0f2` |
