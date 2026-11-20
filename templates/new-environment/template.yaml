@@ -57,7 +57,8 @@ spec:
           title: Services to deploy
           description: Each starts at the image tag currently running in dev.
           type: array
-          minItems: 1
+          # No minItems here: the form would pre-fill [undefined] and crash MultiEntityPicker.
+          # gitops:read-image-tags rejects an empty list.
           items:
             type: string
           ui:field: MultiEntityPicker
