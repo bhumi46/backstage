@@ -1,0 +1,57 @@
+image:
+  repository: ghcr.io/bhumi46/backstage
+  # Pinned to the commit SHA in gitops (platform/backstage/values.yaml).
+  tag: ""
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+
+# Existing read-only ServiceAccount created by platform-infra (modules/backstage-access).
+# The Kubernetes plugin uses its mounted token, so no cluster token is stored anywhere.
+serviceAccountName: backstage-reader
+
+# Secret with GITHUB_TOKEN, AUTH_GITHUB_CLIENT_ID/SECRET, ARGOCD_AUTH_TOKEN, POSTGRES_USER/PASSWORD,
+# BACKSTAGE_TEST_TOKEN. Created outside git by scripts/cluster-secrets.sh.
+existingSecret: backstage-secrets
+
+service:
+  type: ClusterIP
+  port: 7007
+
+# Extra environment variables (name: value).
+env:
+  LOG_LEVEL: info
+
+resources:
+  requests:
+    cpu: 250m
+    memory: 768Mi
+  limits:
+    cpu: "1"
+    memory: 1Gi
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  runAsGroup: 1000
+  fsGroup: 1000
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop: ["ALL"]
+
+postgresql:
+  image: postgres:17.7-alpine@sha256:bb377b7239d2774ac8cc76f481596ce96c5a6b5e9d141f6d0a0ee371a6e7c0f2
+  storage: 1Gi
+  # Empty = cluster default (kind: local-path).
+  storageClassName: ""
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi

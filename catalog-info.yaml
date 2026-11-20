@@ -5,6 +5,9 @@ metadata:
   description: The IDP lab developer portal (catalog, software templates, plugins).
   annotations:
     github.com/project-slug: bhumi46/backstage
+    # Step 4e: Backstage also runs in the cluster (charts/backstage, gitops apps/backstage.yaml).
+    backstage.io/kubernetes-id: backstage
+    argocd/app-selector: app.kubernetes.io/name=backstage
 spec:
   type: website
   lifecycle: experimental

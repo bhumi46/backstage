@@ -1,19 +1,19 @@
+# Layered on app-config.yaml when Backstage runs in the kind cluster (step 4e; see charts/backstage).
+# Arrays here REPLACE the ones in app-config.yaml (catalog.locations, clusterLocatorMethods).
+# Secrets come from the Kubernetes Secret backstage-secrets (scripts/cluster-secrets.sh), never from git.
+
+# Reached with `kubectl -n backstage port-forward svc/backstage 7007:7007`. Same port as local dev,
+# so the GitHub OAuth app callback (http://localhost:7007/api/auth/github/handler/frame) still works.
+# The backend serves the frontend, so app and backend share one origin.
 app:
-  # Should be the same as backend.baseUrl when using the `app-backend` plugin.
   baseUrl: http://localhost:7007
 
 backend:
-  # Note that the baseUrl should be the URL that the browser and other clients
-  # should use when communicating with the backend, i.e. it needs to be
-  # reachable not just from within the backend host, but from all of your
-  # callers. When its value is "http://localhost:7007", it's strictly private
-  # and can't be reached by others.
   baseUrl: http://localhost:7007
-  # The listener can also be expressed as a single <host>:<port> string. In this case we bind to
-  # all interfaces, the most permissive setting. The right value depends on your specific deployment.
-  listen: ':7007'
-
-  # config options: https://node-postgres.com/apis/client
+  listen:
+    port: 7007
+  cors:
+    origin: http://localhost:7007
   database:
     client: pg
     connection:
@@ -21,35 +21,71 @@ backend:
       port: ${POSTGRES_PORT}
       user: ${POSTGRES_USER}
       password: ${POSTGRES_PASSWORD}
-      # https://node-postgres.com/features/ssl
-      # you can set the sslmode configuration option via the `PGSSLMODE` environment variable
-      # see https://www.postgresql.org/docs/current/libpq-ssl.html Table 33.1. SSL Mode Descriptions (e.g. require)
-      # ssl:
-      #   ca: # if you have a CA file and want to verify it you can uncomment this section
-      #     $file: <file-path>/ca/server.crt
+  # Static token so scripts (and the step 4e checks) can call the API, same as app-config.local.yaml.
+  auth:
+    externalAccess:
+      - type: static
+        options:
+          token: ${BACKSTAGE_TEST_TOKEN}
+          subject: local-test-script
 
 auth:
+  environment: production
   providers:
-    guest: {}
+    github:
+      production:
+        clientId: ${AUTH_GITHUB_CLIENT_ID}
+        clientSecret: ${AUTH_GITHUB_CLIENT_SECRET}
+        signIn:
+          resolvers:
+            - resolver: usernameMatchingUserEntityName
 
+# The image has no repo checkout, so read org, repo list and templates from GitHub.
+# Template skeletons are resolved relative to the template URL.
 catalog:
-  # Overrides the default list locations from app-config.yaml as these contain example data.
-  # See https://backstage.io/docs/features/software-catalog/#adding-components-to-the-catalog for more details
-  # on how to get entities into the catalog.
   locations:
-    # Local example data, replace this with your production config, these are intended for demo use only.
-    # File locations are relative to the backend process, typically in a deployed context, such as in a Docker container, this will be the root
-    - type: file
-      target: ./examples/entities.yaml
-
-    # Local example template
-    - type: file
-      target: ./examples/template/template.yaml
+    - type: url
+      target: https://github.com/bhumi46/backstage/blob/main/catalog/org.yaml
+      rules:
+        - allow: [Group, User, System]
+    - type: url
+      target: https://github.com/bhumi46/backstage/blob/main/catalog/locations.yaml
+    - type: url
+      target: https://github.com/bhumi46/backstage/blob/main/templates/new-go-service/template.yaml
+      rules:
+        - allow: [Template]
+    - type: url
+      target: https://github.com/bhumi46/backstage/blob/main/templates/new-environment/template.yaml
       rules:
         - allow: [Template]
 
-    # Local example organizational data
-    - type: file
-      target: ./examples/org.yaml
-      rules:
-        - allow: [User, Group]
+# Argo CD API through the in-cluster service (server.insecure: plain HTTP on port 80).
+# argocd.baseUrl stays http://localhost:8080 (app-config.yaml) for links you open in the browser.
+proxy:
+  endpoints:
+    '/argocd/api':
+      target: http://argocd-server.argocd.svc/api/v1/
+      changeOrigin: true
+      headers:
+        Authorization: Bearer ${ARGOCD_AUTH_TOKEN}
+
+# In the pod: no token configured, so the plugin uses the pod's own ServiceAccount
+# (backstage-reader, read-only ClusterRole from platform-infra) and the mounted CA.
+kubernetes:
+  serviceLocatorMethod:
+    type: multiTenant
+  clusterLocatorMethods:
+    - type: config
+      clusters:
+        - name: idp-lab
+          url: https://kubernetes.default.svc
+          authProvider: serviceAccount
+          caFile: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+          skipMetricsLookup: true
+
+techdocs:
+  builder: local
+  generator:
+    runIn: local
+  publisher:
+    type: local

@@ -39,6 +39,11 @@ app-config.local.yaml         local overrides (gitignored)
 .env / .env.example           secrets for local runs (.env is gitignored)
 scripts/start.sh              load .env, start PostgreSQL, yarn start
 docker-compose.yaml           local PostgreSQL
+app-config.production.yaml    in-cluster overrides (step 4e)
+packages/backend/Dockerfile   image (host build: yarn build:backend first)
+charts/backstage/             Helm chart: Backstage + PostgreSQL (deployed by gitops apps/backstage.yaml)
+scripts/cluster-secrets.sh    .env -> Secret backstage/backstage-secrets (never printed)
+.github/workflows/ci.yml      test, image, chart, bump gitops platform/backstage/values.yaml
 ```
 
 ## Commands

@@ -14,3 +14,5 @@ spec:
     - https://github.com/bhumi46/users-svc/blob/main/catalog-info.yaml
     - https://github.com/bhumi46/orders-svc/blob/main/catalog-info.yaml
     - https://github.com/bhumi46/backstage/blob/main/catalog-info.yaml
+    # Created by the New Go service template (step 4c); listed here too so a fresh database has it.
+    - https://github.com/bhumi46/payment-svc/blob/main/catalog-info.yaml

@@ -73,6 +73,21 @@ Then, in this order:
 
 Each environment is a namespace in the same kind cluster, managed by the same Argo CD.
 
+## Run in the cluster (step 4e)
+
+The same app also runs in the kind cluster, deployed like any other service:
+
+- **CI** (`.github/workflows/ci.yml`): `tsc`, lint, tests, then `yarn build:backend` and a multi-arch image `ghcr.io/bhumi46/backstage:<sha>` from `packages/backend/Dockerfile`, plus the OCI chart `charts/backstage`. The `bump` job sets `image.tag` in gitops `platform/backstage/values.yaml` (needs the `GITOPS_TOKEN` Actions secret, like the services).
+- **Argo CD** deploys gitops `apps/backstage.yaml` into the `backstage` namespace (created by platform-infra): the Backstage Deployment plus its own PostgreSQL StatefulSet (1Gi PVC).
+- **Config:** `app-config.yaml` + `app-config.production.yaml`. In the pod, the catalog reads `catalog/` and `templates/` from GitHub `main`. The Kubernetes plugin uses the pod's own read-only ServiceAccount `backstage-reader`, and the Argo CD proxy calls `argocd-server.argocd.svc`. TechDocs builds with mkdocs inside the pod.
+- **Secrets** are not in git. `scripts/cluster-secrets.sh` copies `GITHUB_TOKEN`, `AUTH_GITHUB_CLIENT_ID/SECRET`, `ARGOCD_AUTH_TOKEN`, `POSTGRES_USER/PASSWORD` and `BACKSTAGE_TEST_TOKEN` from `.env` into the Secret `backstage/backstage-secrets`, without printing them. Re-run it after changing `.env` or recreating the cluster, then restart the pod.
+
+Open it on the same port as local dev, so the GitHub OAuth callback still matches (stop `yarn start` first):
+
+```sh
+kubectl -n backstage port-forward svc/backstage 7007:7007   # http://localhost:7007
+```
+
 ## Checks
 
 ```sh
@@ -99,4 +114,9 @@ Backstage packages use the ranges written by create-app; `yarn.lock` pins the ex
 | `@backstage/plugin-scaffolder-node` (custom action) | 0.13.8 |
 | `@backstage/backend-plugin-api` (custom action) | 1.11.0 |
 | `yaml` (custom action) | 2.9.1 |
+| Image base `node:24-trixie-slim` | `@sha256:af02d57b57719b9657a45199a79264a9437940cd55b3c7b3fc99615654f124a0` |
+| `mkdocs-techdocs-core` (in the image) | 1.7.1 |
+| Chart `charts/backstage` | 0.1.0 |
+| `actions/setup-node` / `docker/setup-qemu-action` | v7.1.0 / v4.4.0 (other actions as in the services) |
+| Helm / yq in CI | v4.1.0 / v4.54.3 |
 | PostgreSQL image | `postgres:17.7-alpine@sha256:bb377b7239d2774ac8cc76f481596ce96c5a6b5e9d141f6d0a0ee371a6e7c0f2` |
