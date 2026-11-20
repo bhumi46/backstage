@@ -86,6 +86,9 @@ spec:
         repoVisibility: public
         defaultBranch: main
         gitCommitMessage: 'initial commit from the New Go service template'
+        # Changes go through a PR, but a solo owner can merge it (no approving review needed).
+        protectDefaultBranch: true
+        requiredApprovingReviewCount: 0
         secrets:
           GITOPS_TOKEN: ${{ secrets.gitopsToken }}
 
