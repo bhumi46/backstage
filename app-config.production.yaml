@@ -59,12 +59,12 @@ catalog:
       rules:
         - allow: [Template]
 
-# Argo CD API through the in-cluster service (server.insecure: plain HTTP on port 80).
+# Argo CD API through the in-cluster service of the "argo-cd" Helm release (server.insecure: plain HTTP on 80).
 # argocd.baseUrl stays http://localhost:8080 (app-config.yaml) for links you open in the browser.
 proxy:
   endpoints:
     '/argocd/api':
-      target: http://argocd-server.argocd.svc/api/v1/
+      target: http://argo-cd-argocd-server.argocd.svc/api/v1/
       changeOrigin: true
       headers:
         Authorization: Bearer ${ARGOCD_AUTH_TOKEN}

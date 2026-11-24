@@ -79,7 +79,7 @@ The same app also runs in the kind cluster, deployed like any other service:
 
 - **CI** (`.github/workflows/ci.yml`): `tsc`, lint, tests, then `yarn build:backend` and a multi-arch image `ghcr.io/bhumi46/backstage:<sha>` from `packages/backend/Dockerfile`, plus the OCI chart `charts/backstage`. The `bump` job sets `image.tag` in gitops `platform/backstage/values.yaml` (needs the `GITOPS_TOKEN` Actions secret, like the services).
 - **Argo CD** deploys gitops `apps/backstage.yaml` into the `backstage` namespace (created by platform-infra): the Backstage Deployment plus its own PostgreSQL StatefulSet (1Gi PVC).
-- **Config:** `app-config.yaml` + `app-config.production.yaml`. In the pod, the catalog reads `catalog/` and `templates/` from GitHub `main`. The Kubernetes plugin uses the pod's own read-only ServiceAccount `backstage-reader`, and the Argo CD proxy calls `argocd-server.argocd.svc`. TechDocs builds with mkdocs inside the pod.
+- **Config:** `app-config.yaml` + `app-config.production.yaml`. In the pod, the catalog reads `catalog/` and `templates/` from GitHub `main`. The Kubernetes plugin uses the pod's own read-only ServiceAccount `backstage-reader`, and the Argo CD proxy calls `argo-cd-argocd-server.argocd.svc`. TechDocs builds with mkdocs inside the pod.
 - **Secrets** are not in git. `scripts/cluster-secrets.sh` copies `GITHUB_TOKEN`, `AUTH_GITHUB_CLIENT_ID/SECRET`, `ARGOCD_AUTH_TOKEN`, `POSTGRES_USER/PASSWORD` and `BACKSTAGE_TEST_TOKEN` from `.env` into the Secret `backstage/backstage-secrets`, without printing them. Re-run it after changing `.env` or recreating the cluster, then restart the pod.
 
 Open it on the same port as local dev, so the GitHub OAuth callback still matches (stop `yarn start` first):
