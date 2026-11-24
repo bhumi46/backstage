@@ -1,0 +1,32 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: ${{ values.name }}-${{ values.env }}
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: ${{ values.name }}
+    idp.lab/environment: ${{ values.env }}
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  sources:
+    # Chart: OCI artifact published by ${{ values.name }} CI.
+    - repoURL: ghcr.io/bhumi46/charts
+      chart: ${{ values.name }}
+      targetRevision: 0.1.0
+      helm:
+        releaseName: ${{ values.name }}
+        valueFiles:
+          - $values/envs/${{ values.env }}/${{ values.name }}/values.yaml
+    # Values: this repo.
+    - repoURL: https://github.com/bhumi46/gitops.git
+      targetRevision: main
+      ref: values
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: ${{ values.env }}   # created by platform-infra (Terraform), not by Argo CD
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true

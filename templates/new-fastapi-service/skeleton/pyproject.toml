@@ -1,0 +1,77 @@
+[project]
+name = "${{ values.name }}"
+version = "0.1.0"
+description = ${{ values.description | dump }}
+readme = "README.md"
+requires-python = ">=3.13,<3.14"
+dependencies = [
+    "fastapi==0.162.4",
+    "pydantic==2.14.3",
+    "pydantic-settings==2.16.2",
+    "uvicorn==0.54.0",
+    "uvicorn-worker==0.4.0",
+    "gunicorn==27.0.0",
+    "sqlalchemy[asyncio]==2.1.8",
+    "psycopg[binary]==3.3.8",
+    "alembic==1.20.1",
+    "httpx==0.28.1",
+    "prometheus-client==0.26.0",
+    "python-json-logger==4.2.0",
+]
+
+[dependency-groups]
+dev = [
+    "ruff==0.17.4",
+    "mypy==2.4.1",
+    "pytest==9.2.0",
+    "pytest-asyncio==1.4.1",
+    "pytest-cov==7.1.0",
+]
+
+[tool.uv]
+# An application, not a library: dependencies only, code runs from src/ (PYTHONPATH).
+package = false
+# Reproducible resolution: ignore anything published after this date (bump deliberately).
+exclude-newer = "2026-11-11T00:00:00Z"
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "W", "F", "I", "B", "UP", "S", "SIM", "RUF", "ASYNC", "FAST", "PT", "N", "C4", "DTZ", "T20", "PL", "PTH"]
+ignore = ["PLR2004"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101"]
+# Deliberate late import: prometheus only in the server process.
+"gunicorn.conf.py" = ["PLC0415"]
+
+[tool.ruff.lint.flake8-bugbear]
+# FastAPI dependency markers are evaluated once at import time by design.
+extend-immutable-calls = ["fastapi.Depends", "fastapi.Query", "fastapi.Path"]
+
+[tool.mypy]
+strict = true
+python_version = "3.13"
+mypy_path = "src"
+explicit_package_bases = true
+files = ["src", "tests", "alembic", "gunicorn.conf.py"]
+plugins = ["pydantic.mypy"]
+
+[[tool.mypy.overrides]]
+module = ["gunicorn.*"]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+pythonpath = ["src", "."]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "session"
+asyncio_default_test_loop_scope = "session"
+addopts = "-ra --strict-markers --cov=src --cov-branch --cov-report=term-missing --cov-fail-under=85"
+
+[tool.coverage.run]
+# SQLAlchemy async runs code in greenlets; without this, coverage misses those lines.
+concurrency = ["thread", "greenlet"]

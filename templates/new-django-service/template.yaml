@@ -1,0 +1,165 @@
+apiVersion: scaffolder.backstage.io/v1beta3
+kind: Template
+metadata:
+  name: new-django-service
+  title: New Django service
+  description: >-
+    Creates a production-ready Django 5.2 LTS + DRF service (uv, ruff, mypy --strict, pytest, JSON
+    logs, Prometheus metrics, non-root image) with its own PostgreSQL (CloudNativePG), migrations run
+    by Argo CD before each rollout, CI, Helm chart, catalog entry and docs. Opens a PR in gitops that
+    deploys it. Backstage only creates the repo and the PR.
+  tags: [python, django, postgresql, recommended]
+spec:
+  owner: group:platform-team
+  type: service
+
+  parameters:
+    - title: Service
+      required: [name, description, owner]
+      properties:
+        name:
+          title: Name
+          type: string
+          description: Repo, image, chart, database and Kubernetes name, e.g. catalog-svc.
+          pattern: '^[a-z][a-z0-9-]{1,38}[a-z0-9]$'
+          ui:field: EntityNamePicker
+          ui:autofocus: true
+        description:
+          title: Description
+          type: string
+          maxLength: 200
+        owner:
+          title: Owner
+          type: string
+          ui:field: OwnerPicker
+          ui:options:
+            catalogFilter:
+              kind: Group
+          default: group:platform-team
+        dependsOn:
+          title: Depends on (optional)
+          type: string
+          description: >-
+            Another service this one calls. Adds dependsOn to the catalog entry and
+            <NAME>_URL (e.g. CATALOG_SVC_URL) to the gitops values for each environment.
+          ui:field: EntityPicker
+          ui:options:
+            allowArbitraryValues: false
+            catalogFilter:
+              kind: Component
+              spec.type: service
+
+    - title: Deployment
+      # gitopsToken is a Secret field: its value is sent as a task secret, not a parameter, so it can't
+      # be listed in "required" (server-side validation only sees parameters).
+      required: [environments]
+      properties:
+        environments:
+          title: Environments
+          description: Namespaces created by platform-infra. Dev is updated by CI; others are promoted by PR.
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items:
+            type: string
+            enum: [dev, staging, qa]
+          default: [dev]
+          ui:widget: checkboxes
+        gitopsToken:
+          title: GitOps token
+          type: string
+          description: >-
+            PAT with write access to bhumi46/gitops. Stored only as the new repo's GITOPS_TOKEN Actions
+            secret so its CI can bump the dev image tag.
+          ui:field: Secret
+
+  steps:
+    # Shared Python base first (CI, Helm chart with CNPG database + migration Job, docs, tooling),
+    # then the framework-specific project on top.
+    - id: fetch-common
+      name: Generate shared Python base
+      action: fetch:template
+      input:
+        url: ../python-common/skeleton
+        targetPath: ./service
+        # GitHub Actions ${{ }} and Helm {{ }} syntax must not go through the template engine.
+        copyWithoutTemplating:
+          - .github/workflows/*
+          - charts/*/templates/*
+        values: &values
+          name: ${{ parameters.name }}
+          description: ${{ parameters.description }}
+          owner: ${{ parameters.owner }}
+          dependsOn: ${{ parameters.dependsOn }}
+          framework: django
+
+    - id: fetch-service
+      name: Generate Django project
+      action: fetch:template
+      input:
+        url: ./skeleton
+        targetPath: ./service
+        values: *values
+
+    - id: publish
+      name: Create repository
+      action: publish:github
+      input:
+        sourcePath: ./service
+        repoUrl: github.com?owner=bhumi46&repo=${{ parameters.name }}
+        description: ${{ parameters.description }}
+        repoVisibility: public
+        defaultBranch: main
+        gitCommitMessage: 'initial commit from the New Django service template'
+        # Changes go through a PR, but a solo owner can merge it (no approving review needed).
+        protectDefaultBranch: true
+        requiredApprovingReviewCount: 0
+        secrets:
+          GITOPS_TOKEN: ${{ secrets.gitopsToken }}
+
+    - id: fetch-gitops
+      name: Generate gitops files
+      each: ${{ parameters.environments }}
+      action: fetch:template
+      input:
+        url: ../python-common/gitops-skeleton
+        targetPath: ./gitops
+        values:
+          name: ${{ parameters.name }}
+          env: ${{ each.value }}
+          imageTag: ${{ steps['publish'].output.commitHash }}
+          dependsOn: ${{ parameters.dependsOn }}
+
+    - id: gitops-pr
+      name: Open gitops PR
+      action: publish:github:pull-request
+      input:
+        repoUrl: github.com?owner=bhumi46&repo=gitops
+        sourcePath: ./gitops
+        branchName: add-${{ parameters.name }}
+        title: Deploy ${{ parameters.name }} to ${{ parameters.environments | join(', ') }}
+        description: |
+          Adds Argo CD Application(s) and values for **${{ parameters.name }}** (created by the Backstage template *New Django service*).
+
+          - `apps/${{ parameters.name }}-<env>.yaml`
+          - `envs/<env>/${{ parameters.name }}/values.yaml` with `image.tag` = the repo's first commit
+
+          On sync Argo CD creates the CloudNativePG database first, runs the migration Job, then rolls out the app.
+          Merge after the new repo's first CI run is green (image + chart published).
+
+    - id: register
+      name: Register in catalog
+      action: catalog:register
+      input:
+        repoContentsUrl: ${{ steps['publish'].output.repoContentsUrl }}
+        catalogInfoPath: /catalog-info.yaml
+
+  output:
+    links:
+      - title: Repository
+        url: ${{ steps['publish'].output.remoteUrl }}
+      - title: GitOps pull request
+        url: ${{ steps['gitops-pr'].output.remoteUrl }}
+      - title: Open in catalog
+        icon: catalog
+        entityRef: ${{ steps['register'].output.entityRef }}

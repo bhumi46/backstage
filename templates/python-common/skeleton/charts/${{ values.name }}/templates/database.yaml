@@ -1,0 +1,23 @@
+# PostgreSQL for this service, managed by CloudNativePG (wave 0: created before the migration Job).
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: {{ include "svc.dbName" . }}
+  labels:
+    {{- include "svc.labels" . | nindent 4 }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  instances: {{ .Values.database.instances }}
+  imageName: {{ .Values.database.imageName }}
+  bootstrap:
+    initdb:
+      database: app
+      owner: app
+  storage:
+    size: {{ .Values.database.storage }}
+  resources:
+    {{- toYaml .Values.database.resources | nindent 4 }}
+  inheritedMetadata:
+    labels:
+      backstage.io/kubernetes-id: {{ include "svc.name" . }}

@@ -1,0 +1,23 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: ${{ values.name }}
+  description: ${{ values.description | dump }}
+  annotations:
+    github.com/project-slug: bhumi46/${{ values.name }}
+    backstage.io/kubernetes-id: ${{ values.name }}
+    argocd/app-selector: app.kubernetes.io/name=${{ values.name }}
+    backstage.io/techdocs-ref: dir:.
+  tags: [python, ${{ values.framework }}, postgresql]
+  links:
+    - url: https://github.com/bhumi46/${{ values.name }}
+      title: Repository
+spec:
+  type: service
+  lifecycle: experimental
+  owner: ${{ values.owner }}
+  system: idp-lab
+{%- if values.dependsOn %}
+  dependsOn:
+    - ${{ values.dependsOn }}
+{%- endif %}

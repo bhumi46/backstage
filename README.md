@@ -73,6 +73,24 @@ Then, in this order:
 
 Each environment is a namespace in the same kind cluster, managed by the same Argo CD.
 
+### New Django service / New FastAPI service (`templates/new-django-service`, `templates/new-fastapi-service`)
+
+Golden paths for Python services. Both render the shared base `templates/python-common/` first, then their own project:
+
+- **Shared base:**
+  - CI: `uv sync --locked`, ruff, `mypy --strict`, pytest against PostgreSQL with an 85% coverage gate, framework checks, a multi-arch image, the OCI chart and the dev bump
+  - Helm chart: app, a CloudNativePG `Cluster` per service per environment, a migration Job as an Argo CD Sync hook (database → migrate → app via sync waves), PDB and optional HPA
+  - catalog entry, TechDocs, pre-commit, docker-compose PostgreSQL
+- **Django:** Django 5.2 LTS + DRF, split settings (base/dev/test/prod), WhiteNoise for the admin's static files, gunicorn (gthread), `manage.py check --deploy` in CI.
+- **FastAPI:** FastAPI + async SQLAlchemy 2 (psycopg 3) + Alembic, layered `api/services/repositories/models/schemas`, gunicorn with uvicorn workers, `alembic check` in CI.
+- **Both:**
+  - JSON logs with `X-Request-ID`, `/healthz`, `/readyz` (checks the DB) and Prometheus `/metrics` (multiprocess-safe)
+  - non-root (uid 10001) image with a read-only root filesystem
+  - dependencies resolved with `exclude-newer`, so transitive packages also respect the 2-week rule
+- **Optional "Depends on":** adds `dependsOn` to the catalog entry and `<NAME>_URL` (for the same namespace) to the gitops values.
+
+No database password is stored anywhere: the operator creates the Secret `<name>-db-app`, and the app reads `DATABASE_URL` from it. Pinned versions are listed in each generated repo's README.
+
 ## Run in the cluster (step 4e)
 
 The same app also runs in the kind cluster, deployed like any other service:

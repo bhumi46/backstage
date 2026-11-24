@@ -1,0 +1,92 @@
+replicaCount: 1
+
+image:
+  repository: ghcr.io/bhumi46/${{ values.name }}
+  # Overridden per environment in gitops (envs/<env>/${{ values.name }}/values.yaml) with the commit SHA.
+  tag: ""
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+
+service:
+  type: ClusterIP
+  port: 80
+
+containerPort: 8000
+
+# Plain environment variables (name: value). Per-env overrides live in gitops.
+env:
+  LOG_LEVEL: info
+{%- if values.framework == 'django' %}
+  DJANGO_SETTINGS_MODULE: config.settings.prod
+  # Served over plain HTTP (kubectl port-forward) in the lab; set true behind TLS.
+  DJANGO_SECURE_COOKIES: "false"
+{%- endif %}
+
+# Environment variables read from Secrets (name -> secretName/key). "{db}" = the Secret CloudNativePG
+# creates for the app user: "<name>-db-app" (keys: uri, password, username, host, port, dbname).
+secretEnv:
+  # Full connection URI created by CloudNativePG; no password is stored in git.
+  DATABASE_URL: {secretName: "{db}", key: uri}
+{%- if values.framework == 'django' %}
+  # Lab shortcut: reuse the CNPG-generated password as a stable random secret key.
+  # In production, point this at a dedicated Secret (External Secrets / Vault).
+  DJANGO_SECRET_KEY: {secretName: "{db}", key: password}
+{%- endif %}
+
+# Run once per sync, before the new pods roll out (Argo CD Sync hook, wave 1).
+migrations:
+  enabled: true
+{%- if values.framework == 'django' %}
+  command: ["python", "manage.py", "migrate", "--noinput"]
+{%- else %}
+  command: ["alembic", "upgrade", "head"]
+{%- endif %}
+  backoffLimit: 6
+  activeDeadlineSeconds: 600
+
+# PostgreSQL managed by the CloudNativePG operator (installed by platform-infra).
+database:
+  instances: 1
+  imageName: ghcr.io/cloudnative-pg/postgresql:17.7-standard-trixie@sha256:e079dae5253fa6ed26fc65fda06d515af764dbec392dd4b46b17ab11eebd8131
+  storage: 1Gi
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 384Mi
+
+# Keep at least one pod during voluntary disruptions (node drains).
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+# Needs metrics-server (not installed in the lab kind cluster).
+autoscaling:
+  enabled: false
+  minReplicas: 2
+  maxReplicas: 5
+  targetCPUUtilizationPercentage: 75
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 10001
+  runAsGroup: 10001
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop: ["ALL"]

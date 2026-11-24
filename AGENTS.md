@@ -32,6 +32,9 @@ packages/backend/             backend (catalog, scaffolder, auth, kubernetes, te
 templates/
   new-go-service/template.yaml + skeleton/   (copied from orders-svc, ${{ values.name }} placeholders)
   new-environment/template.yaml + skeleton/  (env YAML for platform-infra, values for gitops)
+  python-common/skeleton + gitops-skeleton/  shared Python base: CI, Helm chart (CNPG db + migrate Job), docs
+  new-django-service/  template.yaml + skeleton/  (Django 5.2 LTS + DRF on top of python-common)
+  new-fastapi-service/ template.yaml + skeleton/  (FastAPI + SQLAlchemy/Alembic on top of python-common)
 catalog/                      org.yaml (Group platform-team, Users), locations
 app-config.yaml               base config; secrets via env vars only
 catalog/locations.yaml        Location listing the 5 repos' catalog-info.yaml
